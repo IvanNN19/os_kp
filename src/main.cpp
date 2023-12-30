@@ -26,6 +26,7 @@ void executeJob(const std::string& job, int k) {
 
     if (pid == 0) {
         std::cout << "ID job: " << getpid() << " " << job << "\n";
+        std::cout << job << " Буду работать: " << k << " секунд." << "\n";
         sleep(k);
         exit(0);
     } else {
@@ -206,7 +207,8 @@ bool hasStartAndEndJobs(const Json::Value& jobs) {
 }
 
 int main() {
-    std::ifstream file("diman.json");
+    int k;
+    std::ifstream file("f_test.json");
     Json::Value data;
     file >> data;
     Json::Value jobb = data["jobs"];
@@ -229,7 +231,6 @@ int main() {
 
     std::cout << "ID потока: " << getpid() << "\n";
 
-    int n = data["jobs"].getMemberNames().size(); //? int n = jobb.getMemberNames().size(); ?? не нужна)
     std::vector<std::string> jobs;
     for (const auto& job : data["jobs"].getMemberNames()) {
         //std::cout << job << "\n";
@@ -247,10 +248,6 @@ int main() {
         dependencies_map[job] = dependencies;
     }
 
-    // for (const auto& job : jobs) {
-    //     std::cout << dependencies_map[job] << "\n";
-    // }
-
     for (const std::string& job : jobs) {
         //std::cout << "!!!!" << job << "\n";
         if(dependencies_map[job].size() == 0 && visitedJobs.count(job) == 0){
@@ -258,7 +255,8 @@ int main() {
             for (const std::string& job : jobs) {
                 if(dependencies_map[job].size() == 0){
                     visitedJobs.insert(job);
-                    threads.emplace_back(executeJob, job, 1);
+                    k = rand()%5;
+                    threads.emplace_back(executeJob, job, k);
                 }
             }
             for (auto& thread : threads) {
@@ -287,26 +285,14 @@ int main() {
 
                 for(const auto& elem_job : using_jobs){
                     visitedJobs.insert(elem_job);
-                    threads.emplace_back(executeJob, elem_job, 1);
+                    k = rand()%5;
+                    threads.emplace_back(executeJob, elem_job, k);
                 }
                 for (auto& thread : threads) {
                     thread.join();
                 }
-                // for(const auto& elem : currentDependencies){
-                //     std::cout << elem << "\n";
-                // }
             }
         }
-        //continue;
-
-
-
-
-
-
-
-        //if(job != "job1" && job != "job2")
-        //processJob(job, dependencies_map, visitedJobs);
     }
 
     std::cout << "Все работы завершены" << std::endl;
