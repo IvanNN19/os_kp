@@ -17,7 +17,7 @@
 #include "ctype.h"
 
 
-void executeJob(const std::string& job, int k) {
+void executeJob(const std::string& job) {
     pid_t pid = fork();
 
     if (pid == -1) {
@@ -25,24 +25,19 @@ void executeJob(const std::string& job, int k) {
     }
 
     if (pid == 0) {
-        std::cout << "ID job: " << getpid() << " " << job << "\n";
-        sleep(k);
+        sleep(1);
         exit(0);
     } else {
         std::cout << "Выполняется работа: " << job << std::endl;
-        wait(NULL);
+        sleep(1);
         std::cout << "Работа завершена: " << job << std::endl;
-    } 
+        wait(NULL);
+    }
 }
 
 
 void processJob(const std::string& job, const std::unordered_map<std::string, std::vector<Json::String>>& dependencies, 
 std::unordered_set<std::string>& visitedJobs) {
-
-    std::cout << visitedJobs.size() << " " << dependencies.size() << std::endl;
-    //int k = rand()%5;
-    int k = 1;
-    std::cout << k << "\n";
 
     if (visitedJobs.size() == dependencies.size()) {
         return;
@@ -52,50 +47,30 @@ std::unordered_set<std::string>& visitedJobs) {
         visitedJobs.insert(job);
     }
     
-    if (dependencies.count(job) == 1) {
-        const std::vector<Json::String>& currentDependencies = dependencies.at(job); //Возвращает ссылку на элемент в заданном положении в векторе.
+    if (dependencies.count(job) > 0) {
+        const std::vector<Json::String>& currentDependencies = dependencies.at(job);
 
-        std::cout << std::this_thread::get_id() << std::endl;
-        std::cout << currentDependencies.size() << std::endl;
-
-
-        if (currentDependencies.size() > 1 or currentDependencies.size() == 0) {
+        if (currentDependencies.size() > 1) {
             std::vector<std::thread> threads;
-            if(currentDependencies.size() == 0){
-                std::cout << "popa" << "\n";
-
-            }else{
-                for (const auto& dependency : currentDependencies) {
-                std::cout << "228\n";
-                for(auto i : visitedJobs)
-                    std::cout << i << std::endl;
+            for (const auto& dependency : currentDependencies) {
                 if (visitedJobs.count(dependency) == 0) {
                     visitedJobs.insert(dependency);
-                    //std::cout << dependency << std::endl;
                     if (visitedJobs.size() == dependencies.size()) {
-                        std::cout << "12345\n";
-                        threads.emplace_back(std::thread(executeJob, dependency, k));//?
-                        std::cout << std::this_thread::get_id() << " 12345" << std::endl;
+                        threads.emplace_back(executeJob, dependency);
                     } else {
-                        std::cout << "55555\n";
                         threads.emplace_back(processJob, job, std::ref(dependencies), std::ref(visitedJobs));
-                        std::cout << std::this_thread::get_id() << " 55555" <<  std::endl;
                     }
-                }
+                }   
             }
             for (auto& thread : threads) {
-                std::cout << "wait///" <<  std::endl;
                 thread.join();
             }
-        }
-            
         } else {
             for (const auto& dependency : currentDependencies) {
-                std::cout << "337\n";
                 if (visitedJobs.count(dependency) == 0) {
                     visitedJobs.insert(dependency);
                     if (visitedJobs.size() == dependencies.size()) {
-                        executeJob(dependency, k);
+                        executeJob(dependency);
                     } else {
                         processJob(dependency, dependencies, visitedJobs);
                     }
@@ -103,19 +78,19 @@ std::unordered_set<std::string>& visitedJobs) {
             }
         }
     }
-    std::cout << "end.\n";
-    executeJob(job, k);
+
+    executeJob(job);
 }
 
 bool hasCycle(const Json::Value& jobs, const std::string& currentJob, std::set<std::string>& visited, std::set<std::string>& recursionStack) {
     visited.insert(currentJob);
     recursionStack.insert(currentJob);
 
-    const Json::Value& dependencies = jobs[currentJob]["dependencies"]; //?
+    const Json::Value& dependencies = jobs[currentJob]["dependencies"];
     for (const auto& dependency : dependencies) {
         const std::string& dependencyJob = dependency.asString();
 
-        if (recursionStack.count(dependencyJob) == 1) {
+        if (recursionStack.count(dependencyJob)) {
             return true;
         }
 
@@ -227,14 +202,13 @@ int main() {
     std::cout << "DAG валидный, можем продолжать" << std::endl << std::endl;
     sleep(1);
 
-    std::cout << "ID потока: " << getpid() << "\n";
-
-    int n = data["jobs"].getMemberNames().size(); //? int n = jobb.getMemberNames().size(); ?? не нужна)
+    int n = data["jobs"].getMemberNames().size();
     std::vector<std::string> jobs;
     for (const auto& job : data["jobs"].getMemberNames()) {
-        //std::cout << job << "\n";
         jobs.push_back(job);
     }
+
+
 
     std::unordered_map<std::string, std::vector<Json::String>> dependencies_map;
     std::unordered_set<std::string> visitedJobs;
@@ -247,70 +221,12 @@ int main() {
         dependencies_map[job] = dependencies;
     }
 
-    // for (const auto& job : jobs) {
-    //     std::cout << dependencies_map[job] << "\n";
-    // }
 
     for (const std::string& job : jobs) {
-        //std::cout << "!!!!" << job << "\n";
-        if(dependencies_map[job].size() == 0 && visitedJobs.count(job) == 0){
-            std::vector<std::thread> threads;
-            for (const std::string& job : jobs) {
-                if(dependencies_map[job].size() == 0){
-                    visitedJobs.insert(job);
-                    threads.emplace_back(executeJob, job, 1);
-                }
-            }
-            for (auto& thread : threads) {
-                thread.join();
-            }
-            //std::cout << job << ": " << dependencies_map[job].size() << "\n";
-        }
-        else{
-            if(dependencies_map[job].size() != 0 && visitedJobs.count(job) == 0){
-                //std::cout << job << "<- job" << "\n";
-                std::vector<std::thread> threads;
-                
-                std::vector<std::string> using_jobs;
-                for(const std::string& JOB : jobs){
-                    //std::cout << "????" << JOB << "\n";
-                    const std::vector<Json::String>& currentDependencies = dependencies_map.at(JOB);
-                    for(const auto& elem : currentDependencies){
-                        //std::cout << JOB << "<---- job " << elem << "\n";
-                        if(visitedJobs.count(elem) == 1 && visitedJobs.count(JOB) == 0){
-                            //std::cout << JOB << "<- job " << elem << "\n";
-                            using_jobs.push_back(JOB);
-                            break;
-                        }
-                    }
-                }
-
-                for(const auto& elem_job : using_jobs){
-                    visitedJobs.insert(elem_job);
-                    threads.emplace_back(executeJob, elem_job, 1);
-                }
-                for (auto& thread : threads) {
-                    thread.join();
-                }
-                // for(const auto& elem : currentDependencies){
-                //     std::cout << elem << "\n";
-                // }
-            }
-        }
-        //continue;
-
-
-
-
-
-
-
-        //if(job != "job1" && job != "job2")
-        //processJob(job, dependencies_map, visitedJobs);
+        processJob(job, dependencies_map, visitedJobs);
     }
 
     std::cout << "Все работы завершены" << std::endl;
 
     return 0;
 }
- 
